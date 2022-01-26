@@ -5,6 +5,7 @@ from radiomics import featureextractor, firstorder
 from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
+import csv
 
 
 # A function for creating indexes needed for maintaining files
@@ -54,9 +55,10 @@ extractor = featureextractor.RadiomicsFeatureExtractor()
 no_train_indexes = 0
 # Dividing data into two subsets: training and testing data, using Stratified KFold Cross-Validator
 stratified_k_fold = StratifiedKFold(n_splits=3, shuffle=True)
+iteration = 0
 for train_index, test_index in stratified_k_fold.split(X, y):
-    # numpyArray = np.array((129, 2), dtype=object)
-    numpyArray2 = np.array((245, 1), dtype=object)
+    iteration += 1
+    keys, values, tmp = [], [], []
     for i in train_index:
         no_train_indexes += 1
         if i < 98:
@@ -69,17 +71,15 @@ for train_index, test_index in stratified_k_fold.split(X, y):
         image = image_and_mask[0]
         mask = image_and_mask[1]
         extracted_features = extractor.execute(image, mask)
-        # for key, value in six.iteritems(extracted_features):
-        #     print(key, value)
-        # result = extracted_features.items()
-        # data = list(result)
-        # numpyArray.fill(data)
-        # numpyArray = np.array(data)
-        # print(numpyArray)
-        numpyArray2.fill(extracted_features)
-    print('pierwsza')
-    pca = PCA(n_components=2)
-    X_new = pca.fit_transform(numpyArray2)
-    print('druga')
-    # print(X_new)
+        if no_train_indexes == 1:
+            with open("extracted_features" + str(iteration) +".csv", "w") as outfile:
+                csvwriter = csv.writer(outfile)
+                csvwriter(extracted_features)
+                csvwriter.writerow(extracted_features.values())
+        else:
+            with open("extracted_features" + str(iteration) +".csv", "a") as outfile:
+                csvwriter = csv.writer(outfile)
+                csvwriter.writerow(extracted_features.values())
     no_train_indexes = 0
+
+
