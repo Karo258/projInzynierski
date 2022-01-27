@@ -84,7 +84,7 @@ for train_index, test_index in stratified_k_fold.split(X, y):
                 csvwriter.writerow(extracted_features.values())
     no_train_indexes = 0
 
-for i in range(0, iteration):
+for i in range(1, iteration+1):
     df = pd.read_csv("extracted_features" + str(i) + ".csv")
 
     features = ['diagnostics_Image-original_Mean', 'diagnostics_Image-original_Minimum', 'diagnostics_Image'
@@ -133,11 +133,8 @@ for i in range(0, iteration):
             'original_glszm_ZonePercentage', 'original_glszm_ZoneVariance', 'original_ngtdm_Busyness',
             'original_ngtdm_Coarseness', 'original_ngtdm_Complexity', 'original_ngtdm_Contrast',
             'original_ngtdm_Strength']
-
     x = df.loc[:, features].values
-
     x = StandardScaler().fit_transform(x)
     pca = PCA(n_components=29) # do wyjaśnienia 99% wariancji potrzebnych jest 29 cech
     principalComponents = pca.fit_transform(x)
-
     print(pca.explained_variance_ratio_)
