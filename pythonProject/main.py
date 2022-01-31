@@ -52,6 +52,10 @@ for number in numbers:
 # Creating a numpy array of "labels" -> HGG/LGG for stratifying data
 y = np.hstack(([0] * 259, [1] * 76, [0] * 33))
 
+name_mapping = pd.read_csv("MICCAI_BraTS2020_TrainingData/name_mapping.csv")
+name_mapping_feature = ['Grade']
+grades = name_mapping.loc[:, name_mapping_feature].values
+
 # Creating an extractor for getting radiomic features
 extractor = featureextractor.RadiomicsFeatureExtractor()
 
@@ -86,10 +90,16 @@ for train_index, test_index in stratified_k_fold.split(X, y):
                 csv_writer = csv.writer(out_file)
                 csv_writer.writerow(extracted_features)
                 csv_writer.writerow(extracted_features.values())
+            with open("glioma_grades" + str(iteration_train_index) + ".csv", "w") as out_file:
+                csv_writer = csv.writer(out_file)
+                csv_writer.writerow(grades[i])
         else:
             with open("extracted_features" + str(iteration_train_index) + ".csv", "a") as out_file:
                 csv_writer = csv.writer(out_file)
                 csv_writer.writerow(extracted_features.values())
+            with open("glioma_grades" + str(iteration_train_index) + ".csv", "a") as out_file:
+                csv_writer = csv.writer(out_file)
+                csv_writer.writerow(grades[i])
     no_train_indexes = 0
     iteration_test_index += 1
     for i in test_index:
@@ -110,16 +120,26 @@ for train_index, test_index in stratified_k_fold.split(X, y):
                 csv_writer = csv.writer(out_file)
                 csv_writer.writerow(extracted_features)
                 csv_writer.writerow(extracted_features.values())
+            with open("glioma_grades_test" + str(iteration_test_index) + ".csv", "w") as out_file:
+                csv_writer = csv.writer(out_file)
+                csv_writer.writerow(grades[i])
         else:
             with open("extracted_features_test" + str(iteration_test_index) + ".csv", "a") as out_file:
                 csv_writer = csv.writer(out_file)
                 csv_writer.writerow(extracted_features.values())
+            with open("glioma_grades_test" + str(iteration_test_index) + ".csv", "a") as out_file:
+                csv_writer = csv.writer(out_file)
+                csv_writer.writerow(grades[i])
     no_test_indexes = 0
 
 # The loop for reading .csv files and applying the PCA variance function
 for i in range(1, iteration_train_index + 1):
     # df = pd.read_csv("extracted_features1.csv")
-    df = pd.read_csv("extracted_features" + str(i) + ".csv")
+    data_file_train = pd.read_csv("extracted_features" + str(i) + ".csv")
+    data_file_test = pd.read_csv("extracted_features_test" + str(i) + ".csv")
+    data_file_grades_train = pd.read_csv("glioma_grades_train" + str(i) + ".csv")
+    data_file_grades_test = pd.read_csv("glioma_grades_test" + str(i) + ".csv")
+
     # Features that are headers of float values in .csv files used for PCA
     features = ['diagnostics_Image-original_Mean', 'diagnostics_Image-original_Minimum', 'diagnostics_Image'
                                                                                          '-original_Maximum',
@@ -169,8 +189,19 @@ for i in range(1, iteration_train_index + 1):
                 'original_glszm_ZonePercentage', 'original_glszm_ZoneVariance', 'original_ngtdm_Busyness',
                 'original_ngtdm_Coarseness', 'original_ngtdm_Complexity', 'original_ngtdm_Contrast',
                 'original_ngtdm_Strength']
-x = df.loc[:, features].values
-x = StandardScaler().fit_transform(x)
+X_train = data_file_train.loc[:, features].values
+X_test = data_file_test.loc[:, features].values
+Y_train = data_file_grades_train.values
+Y_test = data_file_grades_test.values
+X_train = StandardScaler().fit_transform(X_train)
+X_test = StandardScaler().fit_transform(X_test)
+# Y_train = StandardScaler().fit_transform(Y_train)
+# Y_test = StandardScaler().fit_transform(Y_test)
 pca = PCA(n_components=29)  # do wyjaśnienia 99% wariancji potrzebnych jest 29 cech
-principalComponents = pca.fit_transform(x)
-print(pca.explained_variance_ratio_)
+X_train = pca.fit_transform(X_train)
+explained_variance = pca.explained_variance_ratio_
+classifier = RandomForestClassifier(max_depth=2)
+classifier.fit(X_train, Y_train)
+
+Y_predict = classifier.predict(X_test)
+print(Y_predict )
