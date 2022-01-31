@@ -2,6 +2,7 @@ from zipfile import ZipFile
 import radiomics.generalinfo
 from radiomics import featureextractor
 from sklearn.decomposition import PCA
+from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
 import csv
@@ -92,6 +93,7 @@ for train_index, test_index in stratified_k_fold.split(X, y):
                 csv_writer.writerow(extracted_features.values())
             with open("glioma_grades" + str(iteration_train_index) + ".csv", "w") as out_file:
                 csv_writer = csv.writer(out_file)
+                csv_writer.writerow(name_mapping_feature)
                 csv_writer.writerow(grades[i])
         else:
             with open("extracted_features" + str(iteration_train_index) + ".csv", "a") as out_file:
@@ -122,6 +124,7 @@ for train_index, test_index in stratified_k_fold.split(X, y):
                 csv_writer.writerow(extracted_features.values())
             with open("glioma_grades_test" + str(iteration_test_index) + ".csv", "w") as out_file:
                 csv_writer = csv.writer(out_file)
+                csv_writer.writerow(name_mapping_feature)
                 csv_writer.writerow(grades[i])
         else:
             with open("extracted_features_test" + str(iteration_test_index) + ".csv", "a") as out_file:
@@ -132,12 +135,14 @@ for train_index, test_index in stratified_k_fold.split(X, y):
                 csv_writer.writerow(grades[i])
     no_test_indexes = 0
 
+iteration_train_index = 3
+
 # The loop for reading .csv files and applying the PCA variance function
 for i in range(1, iteration_train_index + 1):
     # df = pd.read_csv("extracted_features1.csv")
     data_file_train = pd.read_csv("extracted_features" + str(i) + ".csv")
     data_file_test = pd.read_csv("extracted_features_test" + str(i) + ".csv")
-    data_file_grades_train = pd.read_csv("glioma_grades_train" + str(i) + ".csv")
+    data_file_grades_train = pd.read_csv("glioma_grades" + str(i) + ".csv")
     data_file_grades_test = pd.read_csv("glioma_grades_test" + str(i) + ".csv")
 
     # Features that are headers of float values in .csv files used for PCA
@@ -189,19 +194,38 @@ for i in range(1, iteration_train_index + 1):
                 'original_glszm_ZonePercentage', 'original_glszm_ZoneVariance', 'original_ngtdm_Busyness',
                 'original_ngtdm_Coarseness', 'original_ngtdm_Complexity', 'original_ngtdm_Contrast',
                 'original_ngtdm_Strength']
-X_train = data_file_train.loc[:, features].values
-X_test = data_file_test.loc[:, features].values
-Y_train = data_file_grades_train.values
-Y_test = data_file_grades_test.values
-X_train = StandardScaler().fit_transform(X_train)
-X_test = StandardScaler().fit_transform(X_test)
-# Y_train = StandardScaler().fit_transform(Y_train)
-# Y_test = StandardScaler().fit_transform(Y_test)
-pca = PCA(n_components=29)  # do wyjaśnienia 99% wariancji potrzebnych jest 29 cech
-X_train = pca.fit_transform(X_train)
-explained_variance = pca.explained_variance_ratio_
-classifier = RandomForestClassifier(max_depth=2)
-classifier.fit(X_train, Y_train)
-
-Y_predict = classifier.predict(X_test)
-print(Y_predict )
+    X_train = data_file_train.loc[:, features].values
+    X_test = data_file_test.loc[:, features].values
+    Y_train = data_file_grades_train.loc[:, name_mapping_feature].values
+    length_train = len(Y_train)
+    Y_train_table = np.empty((length_train, 1), int)
+    for j in range(0, length_train):
+        if Y_train[j] == 'HGG':
+            Y_train_table.fill(1)
+        else:
+            Y_train_table.fill(0)
+    Y_train_table = Y_train_table.ravel()
+    Y_test = data_file_grades_test.loc[:, name_mapping_feature].values
+    lenght_test = len(Y_test)
+    Y_test_table = np.empty((lenght_test, 1), int)
+    for j in range(0, lenght_test):
+        if Y_test[j] == 'HGG':
+            Y_test_table.fill(1)
+        else:
+            Y_test_table.fill(0)
+    X_train = StandardScaler().fit_transform(X_train)
+    X_test = StandardScaler().fit_transform(X_test)
+    pca = PCA(n_components=29)  # do wyjaśnienia 99% wariancji potrzebnych jest 29 cech
+    X_train = pca.fit_transform(X_train)
+    X_test = pca.fit_transform(X_test)
+    # Y_train_fit = pca.fit_transform(Y_train_table)
+    explained_variance = pca.explained_variance_ratio_
+    classifier = RandomForestClassifier()
+    Y_train = Y_train.ravel()
+    classifier.fit(X_train, Y_train)
+    Y_predict = classifier.predict(X_test)
+    print(Y_predict)
+    cm = confusion_matrix(Y_test, Y_predict)
+    print(cm)
+    acc_score = accuracy_score(Y_test, Y_predict)
+    print(acc_score)
