@@ -34,6 +34,35 @@ def convert_to_string(value):
         return str(value)
 
 
+# A function for reading image and mask from image files
+def read_image_and_mask(file_number):
+    path_to_image = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_flair.nii.gz'
+    path_to_mask = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_seg.nii.gz'
+    image_mask_tuple = radiomics.featureextractor.RadiomicsFeatureExtractor.loadImage(path_to_image, path_to_mask)
+    return image_mask_tuple
+
+
+# A function for writing extracted features and corresponding glioma grades for the first row
+def write_first_row(features_file, grades_file, iteration, i):
+    with open(features_file + str(iteration) + ".csv", "w") as out_file:
+        csv_writer = csv.writer(out_file)
+        csv_writer.writerow(extracted_features)
+        csv_writer.writerow(extracted_features.values())
+    with open(grades_file + str(iteration) + ".csv", "w") as out_file:
+        csv_writer = csv.writer(out_file)
+        csv_writer.writerow(name_mapping_feature)
+        csv_writer.writerow(grades[i])
+
+
+# A function for writing extracted features and corresponding glioma grades for all rows despite the first one
+def write_all_rows(features_file, grades_file, iteration, i):
+    with open(features_file + str(iteration) + ".csv", "a") as out_file:
+        csv_writer = csv.writer(out_file)
+        csv_writer.writerow(extracted_features.values())
+    with open(grades_file + str(iteration) + ".csv", "a") as out_file:
+        csv_writer = csv.writer(out_file)
+        csv_writer.writerow(grades[i])
+
 # Unzipping the folder containing images
 with ZipFile('C:/Users/Karolina/Desktop/MICCAI_BraTS2020_TrainingData.zip') as zipObj:
     zipObj.extractall()
@@ -41,18 +70,18 @@ with ZipFile('C:/Users/Karolina/Desktop/MICCAI_BraTS2020_TrainingData.zip') as z
 # Table with numbers converted to string that are used while creating paths
 numbers = create_string_table(370)
 
+
 # Creating a numpy array of data
 X = np.empty((368, 1), tuple)
 for number in numbers:
     if number != '099':
-        path_to_image = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_flair.nii.gz'
-        path_to_mask = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_seg.nii.gz'
-        image_mask_tuple = radiomics.featureextractor.RadiomicsFeatureExtractor.loadImage(path_to_image, path_to_mask)
-        X.fill(image_mask_tuple)
+        X.fill(read_image_and_mask(number))
 
 # Creating a numpy array of "labels" -> HGG/LGG for stratifying data
 y = np.hstack(([0] * 259, [1] * 76, [0] * 33))
 
+
+# Reading tumor grades from name_mapping.csv file
 name_mapping = pd.read_csv("MICCAI_BraTS2020_TrainingData/name_mapping.csv")
 name_mapping_feature = ['Grade']
 grades = name_mapping.loc[:, name_mapping_feature].values
@@ -69,7 +98,7 @@ iteration_test_index = 0
 # Dividing data into two subsets: training and testing data, using Stratified KFold Cross-Validator
 stratified_k_fold = StratifiedKFold(n_splits=3, shuffle=True)
 
-# The loop for extracting features and writing them into .csv files
+# The loop for extracting features and writing them and corresponding grades into .csv files
 for train_index, test_index in stratified_k_fold.split(X, y):
     iteration_train_index += 1
     for i in train_index:
@@ -78,30 +107,16 @@ for train_index, test_index in stratified_k_fold.split(X, y):
             number = convert_to_string(i + 1)
         else:
             number = convert_to_string(i + 2)
-        path_to_image = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_flair.nii.gz'
-        path_to_mask = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_seg.nii.gz'
-        image_and_mask = radiomics.featureextractor.RadiomicsFeatureExtractor.loadImage(path_to_image, path_to_mask)
+        image_and_mask = read_image_and_mask(number)
         image = image_and_mask[0]
         mask = image_and_mask[1]
         # Feature extraction
         extracted_features = extractor.execute(image, mask)
         # Writing extracted features into corresponding .csv files
         if no_train_indexes == 1:
-            with open("extracted_features" + str(iteration_train_index) + ".csv", "w") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(extracted_features)
-                csv_writer.writerow(extracted_features.values())
-            with open("glioma_grades" + str(iteration_train_index) + ".csv", "w") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(name_mapping_feature)
-                csv_writer.writerow(grades[i])
+            write_first_row("extracted_features", "glioma_grades", iteration_train_index, i)
         else:
-            with open("extracted_features" + str(iteration_train_index) + ".csv", "a") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(extracted_features.values())
-            with open("glioma_grades" + str(iteration_train_index) + ".csv", "a") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(grades[i])
+            write_all_rows("extracted_features", "glioma_grades", iteration_train_index, i)
     no_train_indexes = 0
     iteration_test_index += 1
     for i in test_index:
@@ -110,29 +125,15 @@ for train_index, test_index in stratified_k_fold.split(X, y):
             number = convert_to_string(i + 1)
         else:
             number = convert_to_string(i + 2)
-        path_to_image = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_flair.nii.gz'
-        path_to_mask = 'MICCAI_BraTS2020_TrainingData/BraTS20_Training_' + number + '/BraTS20_Training_' + number + '_seg.nii.gz'
-        image_and_mask = radiomics.featureextractor.RadiomicsFeatureExtractor.loadImage(path_to_image, path_to_mask)
+        image_and_mask = read_image_and_mask(number)
         image = image_and_mask[0]
         mask = image_and_mask[1]
         # Feature extraction
         extracted_features = extractor.execute(image, mask)
         if no_test_indexes == 1:
-            with open("extracted_features_test" + str(iteration_test_index) + ".csv", "w") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(extracted_features)
-                csv_writer.writerow(extracted_features.values())
-            with open("glioma_grades_test" + str(iteration_test_index) + ".csv", "w") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(name_mapping_feature)
-                csv_writer.writerow(grades[i])
+            write_first_row("extracted_features_test", "glioma_grades_test", iteration_train_index, i)
         else:
-            with open("extracted_features_test" + str(iteration_test_index) + ".csv", "a") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(extracted_features.values())
-            with open("glioma_grades_test" + str(iteration_test_index) + ".csv", "a") as out_file:
-                csv_writer = csv.writer(out_file)
-                csv_writer.writerow(grades[i])
+            write_all_rows("extracted_features_test", "glioma_grades_test", iteration_train_index, i)
     no_test_indexes = 0
 
 iteration_train_index = 3
