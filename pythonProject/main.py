@@ -1,4 +1,5 @@
 from zipfile import ZipFile
+# import keras as keras
 import radiomics.generalinfo
 from radiomics import featureextractor
 from sklearn.decomposition import PCA
@@ -9,6 +10,7 @@ import csv
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
+from tensorflow import keras
 
 
 # A function for creating indexes needed for maintaining files
@@ -98,6 +100,10 @@ iteration_test_index = 0
 # Dividing data into two subsets: training and testing data, using Stratified KFold Cross-Validator
 stratified_k_fold = StratifiedKFold(n_splits=3, shuffle=True)
 
+test_indexes_1 = []
+test_indexes_2 = []
+test_indexes_3 = []
+
 # The loop for extracting features and writing them and corresponding grades into .csv files
 for train_index, test_index in stratified_k_fold.split(X, y):
     iteration_train_index += 1
@@ -118,6 +124,12 @@ for train_index, test_index in stratified_k_fold.split(X, y):
             write_all_rows("extracted_features", "glioma_grades", iteration_train_index, i)
     no_train_indexes = 0
     iteration_test_index += 1
+    if iteration_test_index == 1:
+        test_indexes_1.append(test_index)
+    elif iteration_test_index == 2:
+        test_indexes_2.append(test_index)
+    elif iteration_test_index == 3:
+        test_indexes_3.append(test_index)
     for i in test_index:
         no_test_indexes += 1
         if i < 98:
@@ -134,7 +146,6 @@ for train_index, test_index in stratified_k_fold.split(X, y):
         else:
             write_all_rows("extracted_features_test", "glioma_grades_test", iteration_train_index, i)
     no_test_indexes = 0
-
 
 # The loop for reading .csv files and applying the PCA algorithm
 for i in range(1, iteration_train_index + 1):
@@ -199,14 +210,16 @@ for i in range(1, iteration_train_index + 1):
     X_train = StandardScaler().fit_transform(X_train)
     X_test = StandardScaler().fit_transform(X_test)
     pca = PCA(n_components=29)  # do wyjaśnienia 99% wariancji potrzebnych jest 29 cech
-    X_train = pca.fit_transform(X_train)
-    X_test = pca.fit_transform(X_test)
-    explained_variance = pca.explained_variance_ratio_
+    encoder = keras.models.Sequential([keras.layers.Dense(29, input_shape=[112])])
+    decoder = keras.models.Sequential([keras.layers.Dense(112, input_shape=[29])])
+    autoencoder = keras.models.Sequential([encoder, decoder])
+    autoencoder.compile(loss='mse', optimizer=keras.optimizers.SGD(learning_rate=0.1))
+    codings = autoencoder.predict(X_train)
+    # print(codings)
     classifier = RandomForestClassifier()
     Y_train = Y_train.ravel()
-    classifier.fit(X_train, Y_train)
+    classifier.fit(codings, Y_train)
     Y_predict = classifier.predict(X_test)
-    print(Y_predict)
-    cm = confusion_matrix(Y_test, Y_predict)
     acc_score = accuracy_score(Y_test, Y_predict)
+    print(Y_predict)
     print(acc_score)
