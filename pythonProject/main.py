@@ -214,12 +214,21 @@ for i in range(1, iteration_train_index + 1):
     decoder = keras.models.Sequential([keras.layers.Dense(112, input_shape=[29])])
     autoencoder = keras.models.Sequential([encoder, decoder])
     autoencoder.compile(loss='mse', optimizer=keras.optimizers.SGD(learning_rate=0.1))
+    history = autoencoder.fit(X_train, X_train, epochs=100, validation_data=(X_test, X_test), callbacks=[keras.callbacks.EarlyStopping(patience=10)])
     codings = autoencoder.predict(X_train)
-    # print(codings)
     classifier = RandomForestClassifier()
     Y_train = Y_train.ravel()
     classifier.fit(codings, Y_train)
     Y_predict = classifier.predict(X_test)
     acc_score = accuracy_score(Y_test, Y_predict)
-    print(Y_predict)
-    print(acc_score)
+    if i == 1:
+        print(test_indexes_1.pop(0))
+    elif i == 2:
+        print(test_indexes_2.pop(0))
+    elif i == 3:
+        print(test_indexes_3.pop(0))
+    print("Predicted_value  |   Real value")
+    for j in range(0, len(Y_predict)):
+        print(Y_predict[j], "             |   ", str(Y_test[j]))
+    print("Accuracy: ", acc_score)
+    print("\n")
